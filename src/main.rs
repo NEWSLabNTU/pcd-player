@@ -271,9 +271,9 @@ impl App {
     fn get_bbox_file(&self) -> Option<PathBuf> {
         let bbox_file_path = self.pcd_dir.join(format!("{}.json", &self.file_stem()));
         if !bbox_file_path.exists() {
-            return None;
+            None
         } else {
-            return Some(bbox_file_path);
+            Some(bbox_file_path)
         }
     }
 
@@ -281,12 +281,12 @@ impl App {
         if let Some(vox_dir) = &self.vox_dir {
             let vox_file_path = vox_dir.join(format!("{}.json", &self.file_stem()));
             if !vox_file_path.exists() {
-                return None;
+                None
             } else {
-                return Some(vox_file_path);
+                Some(vox_file_path)
             }
         } else {
-            return None;
+            None
         }
     }
 
@@ -312,7 +312,7 @@ impl App {
                             Field::F64(device_id) => u64::from_f64(device_id[0]),
                         };
                         let active = if point.0.len() >= 7 {
-                            let active = match &point.clone().0[6] {
+                            match &point.clone().0[6] {
                                 Field::I8(active) => u64::from_i8(active[0]),
                                 Field::I16(active) => u64::from_i16(active[0]),
                                 Field::I32(active) => u64::from_i32(active[0]),
@@ -321,8 +321,7 @@ impl App {
                                 Field::U32(active) => u64::from_u32(active[0]),
                                 Field::F32(active) => u64::from_f32(active[0]),
                                 Field::F64(active) => u64::from_f64(active[0]),
-                            };
-                            active
+                            }
                         } else {
                             None
                         };
@@ -427,7 +426,7 @@ impl App {
 
     fn draw_voxel(&mut self, window: &mut Window) -> Result<()> {
         let vox_ann = self.load_pcd()?.2;
-        let color = Point3::from_slice(&[1 as f32, 0 as f32, 0 as f32]);
+        let color = Point3::from_slice(&[1_f32, 0.0, 0.0]);
         if let Some(vox_ann) = vox_ann {
             vox_ann.vox_boxes.iter().for_each(|vox_box| {
                 let size = Point3::from_slice(&[
@@ -457,7 +456,7 @@ impl App {
                 };
                 window.draw_box(size, pose, custom_color);
                 if let Some(id) = vox_box.id {
-                    let text = format!("{}", &id.to_string());
+                    let text = format!("{id}");
                     let pos = match vox_box.heading {
                         Some(heading) => vox_box.vertex(true, true, true, heading),
                         _ => vox_box.center(),
@@ -499,7 +498,7 @@ impl App {
                 let hue = (u128::from_str_radix(&object_key, 16)? % 360) as f32;
                 let (r, g, b) =
                     palette::Srgb::from_color(palette::Hsv::new(hue, 1.0, 1.0)).into_components();
-                Point3::from_slice(&[r as f32, g as f32, b as f32])
+                Point3::from_slice(&[r, g, b])
             };
 
             let size = Point3::from_slice(&[
