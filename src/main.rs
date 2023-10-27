@@ -1,4 +1,5 @@
 use anyhow::Result;
+use clap::Parser;
 use itertools::Itertools;
 use kiss3d::{
     camera::{ArcBall, Camera},
@@ -8,8 +9,7 @@ use kiss3d::{
     window::Window,
 };
 use kiss3d_utils::WindowPlotExt;
-use na::{Point2, Point3, Vector3};
-use nalgebra as na;
+use nalgebra::{Isometry3, Point2, Point3, Translation3, UnitQuaternion, Vector2, Vector3};
 use num_traits::cast::FromPrimitive;
 use palette::FromColor;
 use pcd_rs::Field;
@@ -18,21 +18,20 @@ use std::{
     io::BufReader,
     path::{Path, PathBuf},
 };
-use structopt::StructOpt;
 use supervisely_format as sv;
 
-#[derive(StructOpt)]
+#[derive(Parser)]
 struct Opts {
-    #[structopt(long)]
+    #[clap(long)]
     pub pcd_dir: PathBuf,
 
-    #[structopt(long)]
+    #[clap(long)]
     pub ann_dir: Option<PathBuf>,
-    #[structopt(long)]
+    #[clap(long)]
     pub vox_dir: Option<PathBuf>,
-    #[structopt(long)]
+    #[clap(long)]
     pub colored: bool,
-    #[structopt(default_value = "1.0", long)]
+    #[clap(long, default_value = "1.0")]
     pub point_size: f32,
 }
 
@@ -57,14 +56,14 @@ struct BBox3D {
 }
 
 impl BBox3D {
-    pub fn center(&self) -> na::Point3<f64> {
+    pub fn center(&self) -> Point3<f64> {
         let Self {
             center_x,
             center_y,
             center_z,
             ..
         } = *self;
-        na::Point3::new(center_x, center_y, center_z)
+        Point3::new(center_x, center_y, center_z)
     }
     pub fn vertex(
         &self,
@@ -72,15 +71,15 @@ impl BBox3D {
         y_choice: bool,
         z_choice: bool,
         heading: f64,
-    ) -> na::Point3<f64> {
-        let rotation = na::UnitQuaternion::from_euler_angles(0.0, 0.0, heading);
-        let translation = na::Translation3::new(self.center_x, self.center_y, self.center_z);
-        let pose = na::Isometry3::from_parts(translation, rotation);
+    ) -> Point3<f64> {
+        let rotation = UnitQuaternion::from_euler_angles(0.0, 0.0, heading);
+        let translation = Translation3::new(self.center_x, self.center_y, self.center_z);
+        let pose = Isometry3::from_parts(translation, rotation);
         let point = {
             let x = self.size_x / 2.0 * if x_choice { 1.0 } else { -1.0 };
             let y = self.size_y / 2.0 * if y_choice { 1.0 } else { -1.0 };
             let z = self.size_z / 2.0 * if z_choice { 1.0 } else { -1.0 };
-            na::Point3::new(x, y, z)
+            Point3::new(x, y, z)
         };
         pose * point
     }
@@ -98,7 +97,7 @@ fn main() -> Result<()> {
         vox_dir,
         colored,
         point_size,
-    } = Opts::from_args();
+    } = Opts::parse();
 
     let mut window = Window::new("pcd-player");
 
@@ -173,12 +172,12 @@ fn draw_text_3d(
     window: &mut Window,
     camera: &dyn kiss3d::camera::Camera,
     text: &str,
-    pos: &na::Point3<f32>,
+    pos: &Point3<f32>,
     scale: f32,
     font: &std::rc::Rc<kiss3d::text::Font>,
-    color: &na::Point3<f32>,
+    color: &Point3<f32>,
 ) {
-    let window_size = na::Vector2::new(window.size()[0] as f32, window.size()[1] as f32);
+    let window_size = Vector2::new(window.size()[0] as f32, window.size()[1] as f32);
     let mut window_coord = camera.project(pos, &window_size);
     if window_coord.x.is_nan() || window_coord.y.is_nan() {
         return;
@@ -191,7 +190,7 @@ fn draw_text_3d(
     {
         return;
     }
-    let coord: &na::Point2<f32> = &(window_coord * 2.0).into();
+    let coord: &Point2<f32> = &(window_coord * 2.0).into();
     window.draw_text(text, coord, scale, font, color);
 }
 
@@ -436,18 +435,18 @@ impl App {
                     vox_box.size_y as f32,
                     vox_box.size_z as f32,
                 ]);
-                let translation = na::Vector3::from_column_slice(&[
+                let translation = Vector3::from_column_slice(&[
                     vox_box.center_x as f32,
                     vox_box.center_y as f32,
                     vox_box.center_z as f32,
                 ]);
                 let axis_angle = match vox_box.heading {
                     Some(heading) => {
-                        na::Vector3::from_column_slice(&[0 as f32, 0 as f32, heading as f32])
+                        Vector3::from_column_slice(&[0 as f32, 0 as f32, heading as f32])
                     }
-                    _ => na::Vector3::from_column_slice(&[0 as f32, 0 as f32, 0 as f32]),
+                    _ => Vector3::from_column_slice(&[0 as f32, 0 as f32, 0 as f32]),
                 };
-                let pose = na::Isometry3::new(translation, axis_angle);
+                let pose = Isometry3::new(translation, axis_angle);
                 let custom_color = match vox_box.color {
                     Some(custom_color) => Point3::from_slice(&[
                         custom_color.0 as f32,
@@ -467,10 +466,10 @@ impl App {
                         window,
                         &self.camera,
                         &text,
-                        &na::Point3::cast(pos),
+                        &Point3::cast(pos),
                         50.0,
                         &kiss3d::text::Font::default(),
-                        &na::Point3::new(255.0, 255.0, 255.0),
+                        &Point3::new(255.0, 255.0, 255.0),
                     );
                 }
             });
@@ -508,17 +507,17 @@ impl App {
                 dimensions.y as f32,
                 dimensions.z as f32,
             ]);
-            let translation = na::Vector3::from_column_slice(&[
+            let translation = Vector3::from_column_slice(&[
                 position.x as f32,
                 position.y as f32,
                 position.z as f32,
             ]);
-            let axis_angle = na::Vector3::from_column_slice(&[
+            let axis_angle = Vector3::from_column_slice(&[
                 rotation.x as f32,
                 rotation.y as f32,
                 rotation.z as f32,
             ]);
-            let pose = na::Isometry3::new(translation, axis_angle);
+            let pose = Isometry3::new(translation, axis_angle);
 
             window.draw_box(size, pose, color)
         }
